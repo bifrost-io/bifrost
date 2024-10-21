@@ -17,16 +17,14 @@
 //! Test utilities
 use frame_support::{
 	construct_runtime, derive_impl, parameter_types,
-	traits::{LockIdentifier, LockableCurrency, OnFinalize, OnInitialize, ReservableCurrency},
+	traits::{LockIdentifier, OnFinalize, OnInitialize},
 };
 use sp_core::ConstU32;
 use sp_runtime::{traits::IdentityLookup, Perbill, Percent};
 
 use crate as pallet_parachain_staking;
 use crate::{
-	pallet, AwardedPts, CandidateInfo, CollatorReserveToLockMigrations, Config,
-	DelegatorReserveToLockMigrations, DelegatorState, InflationInfo, Points, Range,
-	COLLATOR_LOCK_ID, DELEGATOR_LOCK_ID,
+	pallet, AwardedPts, Config, InflationInfo, Points, Range, COLLATOR_LOCK_ID, DELEGATOR_LOCK_ID,
 };
 use bifrost_primitives::ParachainStakingPalletId;
 use sp_runtime::BuildStorage;
@@ -393,28 +391,6 @@ pub(crate) fn query_lock_amount(account_id: u64, id: LockIdentifier) -> Option<B
 		}
 	}
 	None
-}
-
-/// fn to reverse-migrate a delegator account from locks back to reserve.
-/// This is used to test the reserve -> lock migration.
-pub(crate) fn unmigrate_delegator_from_lock_to_reserve(account_id: u64) {
-	<DelegatorReserveToLockMigrations<Test>>::remove(&account_id);
-	Balances::remove_lock(DELEGATOR_LOCK_ID, &account_id);
-
-	if let Some(delegator_state) = <DelegatorState<Test>>::get(&account_id) {
-		Balances::reserve(&account_id, delegator_state.total()).expect("reserve() failed");
-	}
-}
-
-/// fn to reverse-migrate a collator account from locks back to reserve.
-/// This is used to test the reserve -> lock migration.
-pub(crate) fn unmigrate_collator_from_lock_to_reserve(account_id: u64) {
-	<CollatorReserveToLockMigrations<Test>>::remove(&account_id);
-	Balances::remove_lock(COLLATOR_LOCK_ID, &account_id);
-
-	if let Some(collator_state) = <CandidateInfo<Test>>::get(&account_id) {
-		Balances::reserve(&account_id, collator_state.bond).expect("reserve() failed");
-	}
 }
 
 #[test]

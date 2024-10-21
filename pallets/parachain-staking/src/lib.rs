@@ -487,16 +487,6 @@ pub mod pallet {
 	pub(crate) type CandidateInfo<T: Config> =
 		StorageMap<_, Twox64Concat, AccountIdOf<T>, CandidateMetadata<BalanceOf<T>>, OptionQuery>;
 
-	#[pallet::storage]
-	/// Temporary storage item to track whether a given delegator's reserve has been migrated.
-	pub(crate) type DelegatorReserveToLockMigrations<T: Config> =
-		StorageMap<_, Twox64Concat, AccountIdOf<T>, bool, ValueQuery>;
-
-	#[pallet::storage]
-	/// Temporary storage item to track whether a given collator's reserve has been migrated.
-	pub(crate) type CollatorReserveToLockMigrations<T: Config> =
-		StorageMap<_, Twox64Concat, AccountIdOf<T>, bool, ValueQuery>;
-
 	/// Stores outstanding delegation requests per collator.
 	#[pallet::storage]
 	pub(crate) type DelegationScheduledRequests<T: Config> = StorageMap<
@@ -878,7 +868,6 @@ pub mod pallet {
 			T::Currency::set_lock(COLLATOR_LOCK_ID, &acc, bond, WithdrawReasons::all());
 			let candidate = CandidateMetadata::new(bond);
 			<CandidateInfo<T>>::insert(&acc, candidate);
-			<CollatorReserveToLockMigrations<T>>::insert(&acc, true);
 			let empty_delegations: Delegations<AccountIdOf<T>, BalanceOf<T>> = Default::default();
 			// insert empty top delegations
 			<TopDelegations<T>>::insert(&acc, empty_delegations.clone());
@@ -987,7 +976,6 @@ pub mod pallet {
 			}
 			total_backing = total_backing.saturating_add(bottom_delegations.total);
 			// return stake to collator
-			Self::jit_ensure_collator_reserve_migrated(&candidate)?;
 			T::Currency::remove_lock(COLLATOR_LOCK_ID, &candidate);
 			<CandidateInfo<T>>::remove(&candidate);
 			<DelegationScheduledRequests<T>>::remove(&candidate);
@@ -1269,85 +1257,6 @@ pub mod pallet {
 
 			Ok(())
 		}
-
-		/// Hotfix to migrate a delegator's reserve to a lock. For any given delegator in the
-		/// provided list:
-		/// * this fn is idempotent
-		/// * is safe to call if the delegator doesn't exist
-		/// * is safe to call if the delegator has been migrated
-		/// * is safe to call if the delegator is a collator (this is a no-op)
-		///
-		/// weight calculation:
-		///   reads:
-		///    * DelegatorReserveToLockMigrations
-		///    * DelegatorState
-		///   writes:
-		///    * unreserve()
-		///    * set_lock()
-		///    * DelegatorReserveToLockMigrations
-		///   other: 50M flat weight + 100M weight per item
-		#[pallet::call_index(27)]
-		#[pallet::weight(
-			T::DbWeight::get().reads_writes(
-				2 * delegators.len() as u64,
-				3 * delegators.len() as u64
-			)
-			.saturating_add(Weight::from_parts(delegators.len() as u64, 0).saturating_mul(100_000_000 as u64))
-			.saturating_add(Weight::from_parts(50_000_000 as u64, 0))
-		)]
-		pub fn hotfix_migrate_delegators_from_reserve_to_locks(
-			origin: OriginFor<T>,
-			delegators: Vec<AccountIdOf<T>>,
-		) -> DispatchResult {
-			ensure_signed(origin)?;
-			ensure!(
-				delegators.len() < 100,
-				DispatchError::Other("Exceeded max allowed delegators.")
-			);
-			for delegator in &delegators {
-				let _ = Self::jit_ensure_delegator_reserve_migrated(delegator); // ignore error
-			}
-
-			Ok(())
-		}
-
-		/// Hotfix to migrate a collator's reserve to a lock. For any given collator in the
-		/// provided list:
-		/// * this fn is idempotent
-		/// * is safe to call if the collator doesn't exist
-		/// * is safe to call if the collator has been migrated
-		/// * is safe to call if the collator is a collator (this is a no-op)
-		///
-		/// weight calculation:
-		///   reads:
-		///    * CollatorReserveToLockMigrations
-		///    * CandidateInfo
-		///   writes:
-		///    * unreserve()
-		///    * set_lock()
-		///    * CollatorReserveToLockMigrations
-		///   other: 50M flat weight + 100M weight per item
-		#[pallet::call_index(28)]
-		#[pallet::weight(
-			T::DbWeight::get().reads_writes(
-				2 * collators.len() as u64,
-				3 * collators.len() as u64
-			)
-			.saturating_add(Weight::from_parts(collators.len() as u64, 0).saturating_mul(100_000_000 as u64))
-			.saturating_add(Weight::from_parts(50_000_000 as u64, 0))
-		)]
-		pub fn hotfix_migrate_collators_from_reserve_to_locks(
-			origin: OriginFor<T>,
-			collators: Vec<AccountIdOf<T>>,
-		) -> DispatchResult {
-			ensure_signed(origin)?;
-			ensure!(collators.len() < 100, DispatchError::Other("Exceeded max allowed collators."));
-			for collator in &collators {
-				let _ = Self::jit_ensure_collator_reserve_migrated(collator); // ignore error
-			}
-
-			Ok(())
-		}
 	}
 
 	impl<T: Config> Pallet<T> {
@@ -1379,7 +1288,6 @@ pub mod pallet {
 					state.add_delegation(Bond { owner: candidate.clone(), amount }),
 					Error::<T>::AlreadyDelegatedCandidate
 				);
-				Self::jit_ensure_delegator_reserve_migrated(&delegator)?;
 				state
 			} else {
 				// first delegation
@@ -1406,7 +1314,6 @@ pub mod pallet {
 			<Total<T>>::put(new_total_locked);
 			<CandidateInfo<T>>::insert(&candidate, state);
 			<DelegatorState<T>>::insert(&delegator, delegator_state);
-			<DelegatorReserveToLockMigrations<T>>::insert(&delegator, true);
 			Self::deposit_event(Event::Delegation {
 				delegator,
 				locked_amount: amount,
@@ -1798,47 +1705,6 @@ pub mod pallet {
 				})
 				.collect();
 			CountedDelegations { uncounted_stake, rewardable_delegations }
-		}
-
-		/// Temporary JIT migration of a single delegator's reserve -> lock. This will query
-		/// whether or not the given delegator has been migrated and migrate it if not. This should
-		/// be removeable once all on-chain delegators have been migrated.
-		pub(crate) fn jit_ensure_delegator_reserve_migrated(
-			delegator: &AccountIdOf<T>,
-		) -> DispatchResult {
-			let is_migrated = <DelegatorReserveToLockMigrations<T>>::get(&delegator);
-			if !is_migrated {
-				let delegator_state =
-					<DelegatorState<T>>::get(&delegator).ok_or(Error::<T>::DelegatorDNE)?;
-				let reserved = delegator_state.total();
-				let _remaining = T::Currency::unreserve(delegator, reserved);
-				T::Currency::set_lock(
-					DELEGATOR_LOCK_ID,
-					delegator,
-					reserved,
-					WithdrawReasons::all(),
-				);
-				<DelegatorReserveToLockMigrations<T>>::insert(&delegator, true);
-			}
-			Ok(())
-		}
-
-		/// Temporary JIT migration of a single collator's reserve -> lock. This will query
-		/// whether or not the given collator has been migrated and migrate it if not. This should
-		/// be removeable once all on-chain collators have been migrated.
-		pub(crate) fn jit_ensure_collator_reserve_migrated(
-			collator: &AccountIdOf<T>,
-		) -> DispatchResult {
-			let is_migrated = <CollatorReserveToLockMigrations<T>>::get(&collator);
-			if !is_migrated {
-				let collator_info =
-					<CandidateInfo<T>>::get(&collator).ok_or(Error::<T>::CandidateDNE)?;
-				let reserved = collator_info.bond;
-				let _remaining = T::Currency::unreserve(collator, reserved);
-				T::Currency::set_lock(COLLATOR_LOCK_ID, collator, reserved, WithdrawReasons::all());
-				<CollatorReserveToLockMigrations<T>>::insert(&collator, true);
-			}
-			Ok(())
 		}
 
 		/// Add reward points to block authors:
