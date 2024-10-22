@@ -159,7 +159,7 @@ pub mod pallet {
 	}
 
 	/// The current storage version, we set to 2 our new version.
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(2);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(3);
 
 	/// Universal fee currency order list for all users
 	#[pallet::storage]
@@ -188,12 +188,19 @@ pub mod pallet {
 
 	#[pallet::error]
 	pub enum Error<T> {
+		/// The account does not have enough balance to perform the operation.
 		NotEnoughBalance,
+		/// An error occurred during currency conversion.
 		ConversionError,
+		/// No weight or fee information is available for the requested operation.
 		WeightAndFeeNotExist,
+		/// The message cannot be weighed, possibly due to insufficient information.
 		UnweighableMessage,
+		/// The XCM execution has failed.
 		XcmExecutionFailed,
+		/// The specified currency is not supported by the system.
 		CurrencyNotSupport,
+		/// The maximum number of currencies that can be handled has been reached.
 		MaxCurrenciesReached,
 	}
 
@@ -212,6 +219,9 @@ pub mod pallet {
 			let who = ensure_signed(origin)?;
 
 			if let Some(fee_currency) = &currency_id {
+				// VBNC is not supported.
+				ensure!(fee_currency != &VBNC, Error::<T>::CurrencyNotSupport);
+
 				UserDefaultFeeCurrency::<T>::insert(&who, fee_currency);
 			} else {
 				UserDefaultFeeCurrency::<T>::remove(&who);

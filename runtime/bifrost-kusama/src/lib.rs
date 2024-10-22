@@ -1904,6 +1904,7 @@ pub mod migrations {
 		frame_support::migrations::RemovePallet<VSBondAuctionName, RocksDbWeight>,
 		bifrost_system_staking::migrations::v1::MigrateToV1<Runtime>,
 		lend_market::migrations::v1::MigrateToV1<Runtime>,
+		bifrost_flexible_fee::migrations::v3::MigrateToV3<Runtime>,
 	);
 }
 

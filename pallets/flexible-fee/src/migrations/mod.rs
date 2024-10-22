@@ -18,3 +18,6 @@
 
 /// Version 2.
 pub mod v2;
+
+/// Version 3.
+pub mod v3;

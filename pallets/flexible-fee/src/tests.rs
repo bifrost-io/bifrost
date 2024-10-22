@@ -21,10 +21,11 @@
 #![cfg(test)]
 use crate::{
 	impls::on_charge_transaction::PaymentInfo, mock::*, BlockNumberFor, BoundedVec, Config,
-	DispatchError::BadOrigin, UserDefaultFeeCurrency,
+	DispatchError::BadOrigin, Error, UserDefaultFeeCurrency,
 };
 use bifrost_primitives::{
-	AccountFeeCurrency, BalanceCmp, CurrencyId, TryConvertFrom, BNC, DOT, KSM, MANTA, VDOT, WETH,
+	AccountFeeCurrency, BalanceCmp, CurrencyId, TryConvertFrom, BNC, DOT, KSM, MANTA, VBNC, VDOT,
+	WETH,
 };
 use frame_support::{
 	assert_noop, assert_ok,
@@ -147,6 +148,19 @@ fn set_user_default_fee_currency_should_work() {
 		assert_eq!(alice_default_currency, BNC);
 
 		assert_ok!(FlexibleFee::set_user_default_fee_currency(origin_signed_alice.clone(), None));
+		assert_eq!(UserDefaultFeeCurrency::<Test>::get(ALICE).is_none(), true);
+	});
+}
+
+#[test]
+fn set_user_default_fee_currency_should_fail_with_error_currency() {
+	new_test_ext().execute_with(|| {
+		let origin_signed_alice = RuntimeOrigin::signed(ALICE);
+		assert_noop!(
+			FlexibleFee::set_user_default_fee_currency(origin_signed_alice.clone(), Some(VBNC)),
+			Error::<Test>::CurrencyNotSupport
+		);
+
 		assert_eq!(UserDefaultFeeCurrency::<Test>::get(ALICE).is_none(), true);
 	});
 }
