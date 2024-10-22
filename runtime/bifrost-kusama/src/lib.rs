@@ -26,6 +26,7 @@
 #[cfg(feature = "std")]
 include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 
+use bifrost_primitives::{BLP_BNC_VBNC, KUSAMA_VBNC_ASSET_INDEX, LP_BNC_VBNC, VBNC};
 use bifrost_slp::{DerivativeAccountProvider, QueryResponseManager};
 use core::convert::TryInto;
 // A few exports that help ease life for downstream crates.
@@ -220,11 +221,140 @@ parameter_types! {
 	pub const StableAssetPalletId: PalletId = PalletId(*b"bf/stabl");
 }
 
+pub struct CallFilter;
+impl Contains<RuntimeCall> for CallFilter {
+	fn contains(call: &RuntimeCall) -> bool {
+		let is_core_call = matches!(
+			call,
+			RuntimeCall::System(_) | RuntimeCall::Timestamp(_) | RuntimeCall::ParachainSystem(_)
+		);
+		if is_core_call {
+			// always allow core call
+			return true;
+		}
+
+		// disable transfer
+		let is_transfer = matches!(call, RuntimeCall::Tokens(_) | RuntimeCall::Balances(_));
+		if is_transfer {
+			let is_disabled =
+				match call {
+					RuntimeCall::Tokens(orml_tokens::Call::transfer {
+						dest: _,
+						currency_id,
+						amount: _,
+					}) =>
+						VBNC == *currency_id ||
+							BLP_BNC_VBNC == *currency_id || LP_BNC_VBNC == *currency_id,
+					RuntimeCall::Tokens(orml_tokens::Call::transfer_all {
+						dest: _,
+						currency_id,
+						keep_alive: _,
+					}) =>
+						VBNC == *currency_id ||
+							BLP_BNC_VBNC == *currency_id || LP_BNC_VBNC == *currency_id,
+					RuntimeCall::Tokens(orml_tokens::Call::transfer_keep_alive {
+						dest: _,
+						currency_id,
+						amount: _,
+					}) =>
+						VBNC == *currency_id ||
+							BLP_BNC_VBNC == *currency_id || LP_BNC_VBNC == *currency_id,
+
+					RuntimeCall::StablePool(bifrost_stable_pool::Call::add_liquidity {
+						pool_id,
+						amounts: _,
+						min_mint_amount: _,
+					}) => *pool_id == 2,
+					RuntimeCall::StablePool(bifrost_stable_pool::Call::swap {
+						pool_id,
+						i: _,
+						j: _,
+						dx: _,
+						min_dy: _,
+					}) => *pool_id == 2,
+					RuntimeCall::StablePool(bifrost_stable_pool::Call::redeem_proportion {
+						pool_id,
+						amount: _,
+						min_redeem_amounts: _,
+					}) => *pool_id == 2,
+					RuntimeCall::StablePool(bifrost_stable_pool::Call::redeem_single {
+						pool_id,
+						amount: _,
+						i: _,
+						min_redeem_amount: _,
+						asset_length: _,
+					}) => *pool_id == 2,
+					RuntimeCall::StablePool(bifrost_stable_pool::Call::redeem_multi {
+						pool_id,
+						amounts: _,
+						max_redeem_amount: _,
+					}) => *pool_id == 2,
+
+					RuntimeCall::ZenlinkProtocol(zenlink_protocol::Call::transfer {
+						asset_id,
+						recipient: _,
+						amount: _,
+					}) => *asset_id == KUSAMA_VBNC_ASSET_INDEX,
+					RuntimeCall::ZenlinkProtocol(zenlink_protocol::Call::add_liquidity {
+						asset_0,
+						asset_1,
+						amount_0_desired: _,
+						amount_1_desired: _,
+						amount_0_min: _,
+						amount_1_min: _,
+						deadline: _,
+					}) => *asset_0 == KUSAMA_VBNC_ASSET_INDEX || *asset_1 == KUSAMA_VBNC_ASSET_INDEX,
+					RuntimeCall::ZenlinkProtocol(zenlink_protocol::Call::remove_liquidity {
+						asset_0,
+						asset_1,
+						liquidity: _,
+						amount_0_min: _,
+						amount_1_min: _,
+						recipient: _,
+						deadline: _,
+					}) => *asset_0 == KUSAMA_VBNC_ASSET_INDEX || *asset_1 == KUSAMA_VBNC_ASSET_INDEX,
+					RuntimeCall::ZenlinkProtocol(
+						zenlink_protocol::Call::swap_exact_assets_for_assets {
+							amount_in: _,
+							amount_out_min: _,
+							path,
+							recipient: _,
+							deadline: _,
+						},
+					) => path.contains(&KUSAMA_VBNC_ASSET_INDEX),
+					RuntimeCall::ZenlinkProtocol(
+						zenlink_protocol::Call::swap_assets_for_exact_assets {
+							amount_out: _,
+							amount_in_max: _,
+							path,
+							recipient: _,
+							deadline: _,
+						},
+					) => path.contains(&KUSAMA_VBNC_ASSET_INDEX),
+					RuntimeCall::ZenlinkProtocol(zenlink_protocol::Call::bootstrap_claim {
+						recipient: _,
+						asset_0,
+						asset_1,
+						deadline: _,
+					}) => *asset_0 == KUSAMA_VBNC_ASSET_INDEX || *asset_1 == KUSAMA_VBNC_ASSET_INDEX,
+
+					_ => false,
+				};
+
+			if is_disabled {
+				// no switched off call
+				return false;
+			}
+		}
+		true
+	}
+}
+
 impl frame_system::Config for Runtime {
 	type AccountData = pallet_balances::AccountData<Balance>;
 	/// The identifier used to distinguish between accounts.
 	type AccountId = AccountId;
-	type BaseCallFilter = InsideBoth<Everything, TxPause>;
+	type BaseCallFilter = InsideBoth<CallFilter, TxPause>;
 	/// Maximum number of block number to block hash mappings to keep (oldest pruned first).
 	type BlockHashCount = BlockHashCount;
 	type BlockLength = RuntimeBlockLength;

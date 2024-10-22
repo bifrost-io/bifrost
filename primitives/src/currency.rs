@@ -90,6 +90,12 @@ pub const LDOT: CurrencyId = CurrencyId::Lend(0);
 pub const LKSM: CurrencyId = CurrencyId::Lend(1);
 pub const LUSDT: CurrencyId = CurrencyId::Lend(2);
 pub const LVDOT: CurrencyId = CurrencyId::Lend(3);
+pub const BLP_BNC_VBNC: CurrencyId = CurrencyId::BLP(2);
+pub const LP_BNC_VBNC: CurrencyId = CurrencyId::LPToken(TokenSymbol::ASG, 0, TokenSymbol::BNC, 1);
+pub const KUSAMA_VBNC_ASSET_INDEX: AssetId =
+	AssetId { chain_id: 2001, asset_type: 2, asset_index: 257 };
+pub const KUSAMA_BNC_ASSET_INDEX: AssetId =
+	AssetId { chain_id: 2001, asset_type: 0, asset_index: 0 };
 
 macro_rules! create_currency_id {
 	($(#[$meta:meta])*
