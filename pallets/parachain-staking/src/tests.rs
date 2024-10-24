@@ -72,7 +72,7 @@ fn invalid_root_origin_fails() {
 fn set_total_selected_event_emits_correctly() {
 	ExtBuilder::default().build().execute_with(|| {
 		// before we can bump total_selected we must bump the blocks per round
-		assert_ok!(ParachainStaking::set_blocks_per_round(RuntimeOrigin::root(), 6u32));
+		assert_ok!(ParachainStaking::set_blocks_per_round(RuntimeOrigin::root(), 7u32));
 		assert_ok!(ParachainStaking::set_total_selected(RuntimeOrigin::root(), 6u32));
 		assert_last_event!(MetaEvent::ParachainStaking(Event::TotalSelectedSet {
 			old: 5u32,
@@ -87,16 +87,19 @@ fn set_total_selected_fails_if_above_blocks_per_round() {
 		assert_eq!(Round::<Test>::get().length, 5); // test relies on this
 		assert_noop!(
 			ParachainStaking::set_total_selected(RuntimeOrigin::root(), 6u32),
-			Error::<Test>::RoundLengthMustBeAtLeastTotalSelectedCollators,
+			Error::<Test>::RoundLengthMustBeGreaterThanTotalSelectedCollators,
 		);
 	});
 }
 
 #[test]
-fn set_total_selected_passes_if_equal_to_blocks_per_round() {
+fn set_total_selected_fails_if_equal_to_blocks_per_round() {
 	ExtBuilder::default().build().execute_with(|| {
 		assert_ok!(ParachainStaking::set_blocks_per_round(RuntimeOrigin::root(), 10u32));
-		assert_ok!(ParachainStaking::set_total_selected(RuntimeOrigin::root(), 10u32));
+		assert_noop!(
+			ParachainStaking::set_total_selected(RuntimeOrigin::root(), 10u32),
+			Error::<Test>::RoundLengthMustBeGreaterThanTotalSelectedCollators,
+		);
 	});
 }
 
@@ -115,17 +118,20 @@ fn set_blocks_per_round_fails_if_below_total_selected() {
 		assert_ok!(ParachainStaking::set_total_selected(RuntimeOrigin::root(), 15u32));
 		assert_noop!(
 			ParachainStaking::set_blocks_per_round(RuntimeOrigin::root(), 14u32),
-			Error::<Test>::RoundLengthMustBeAtLeastTotalSelectedCollators,
+			Error::<Test>::RoundLengthMustBeGreaterThanTotalSelectedCollators,
 		);
 	});
 }
 
 #[test]
-fn set_blocks_per_round_passes_if_equal_to_total_selected() {
+fn set_blocks_per_round_fails_if_equal_to_total_selected() {
 	ExtBuilder::default().build().execute_with(|| {
 		assert_ok!(ParachainStaking::set_blocks_per_round(RuntimeOrigin::root(), 10u32));
 		assert_ok!(ParachainStaking::set_total_selected(RuntimeOrigin::root(), 9u32));
-		assert_ok!(ParachainStaking::set_blocks_per_round(RuntimeOrigin::root(), 9u32));
+		assert_noop!(
+			ParachainStaking::set_blocks_per_round(RuntimeOrigin::root(), 9u32),
+			Error::<Test>::RoundLengthMustBeGreaterThanTotalSelectedCollators,
+		);
 	});
 }
 
@@ -276,7 +282,7 @@ fn round_immediately_jumps_if_current_duration_exceeds_new_blocks_per_round() {
 				selected_collators_number: 1,
 				total_balance: 20
 			}));
-			assert_ok!(ParachainStaking::set_blocks_per_round(RuntimeOrigin::root(), 5u32));
+			assert_ok!(ParachainStaking::set_blocks_per_round(RuntimeOrigin::root(), 6u32));
 			roll_to(18);
 			assert_last_event!(MetaEvent::ParachainStaking(Event::NewRound {
 				starting_block: 18,
