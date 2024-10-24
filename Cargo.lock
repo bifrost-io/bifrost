@@ -8427,11 +8427,12 @@ dependencies = [
 [[package]]
 name = "orml-oracle"
 version = "0.13.0"
-source = "git+https://github.com/bifrost-io/open-runtime-module-library?branch=release-polkadot-v1.13.0#a7ea052e958275502022b25f1fc1e5b0e146fe51"
+source = "git+https://github.com/bifrost-io/open-runtime-module-library?branch=release-polkadot-v1.13.0#f571fa22652850cd94b7918446ae509ae0595d98"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
  "frame-system",
+ "log",
  "orml-traits",
  "orml-utilities",
  "parity-scale-codec",
