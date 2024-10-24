@@ -1825,16 +1825,7 @@ pub mod migrations {
 	use super::*;
 
 	/// Unreleased migrations. Add new ones here:
-	pub type Unreleased = (
-		// permanent migration, do not remove
-		pallet_xcm::migration::MigrateToLatestXcmVersion<Runtime>,
-		bifrost_cross_in_out::migrations::v3::MigrateToV2<Runtime>,
-		bifrost_asset_registry::migrations::v1::MigrateToV1<Runtime>,
-		bifrost_slpx::migration::v2::MigrateToV2<Runtime>,
-		frame_support::migrations::RemovePallet<SystemMakerName, RocksDbWeight>,
-		bifrost_system_staking::migrations::v1::MigrateToV1<Runtime>,
-		lend_market::migrations::v1::MigrateToV1<Runtime>,
-	);
+	pub type Unreleased = pallet_xcm::migration::MigrateToLatestXcmVersion<Runtime>;
 }
 
 /// Executive: handles dispatch to the various modules.
