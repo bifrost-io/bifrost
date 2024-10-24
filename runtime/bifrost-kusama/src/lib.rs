@@ -1893,17 +1893,11 @@ pub mod migrations {
 
 	/// Unreleased migrations. Add new ones here:
 	pub type Unreleased = (
+		bifrost_parachain_staking::migrations::RemoveDelegatorReserveToLockAndCollatorReserveToLock<
+			Runtime,
+		>,
 		// permanent migration, do not remove
 		pallet_xcm::migration::MigrateToLatestXcmVersion<Runtime>,
-		bifrost_cross_in_out::migrations::v3::MigrateToV2<Runtime>,
-		bifrost_asset_registry::migrations::v1::MigrateToV1<Runtime>,
-		bifrost_slpx::migration::v2::MigrateToV2<Runtime>,
-		SystemMakerClearPalletId<Runtime>,
-		VSBondAuctionClearPalletId<Runtime>,
-		frame_support::migrations::RemovePallet<SystemMakerName, RocksDbWeight>,
-		frame_support::migrations::RemovePallet<VSBondAuctionName, RocksDbWeight>,
-		bifrost_system_staking::migrations::v1::MigrateToV1<Runtime>,
-		lend_market::migrations::v1::MigrateToV1<Runtime>,
 	);
 }
 

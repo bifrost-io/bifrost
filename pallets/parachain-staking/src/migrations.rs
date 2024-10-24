@@ -18,9 +18,12 @@
 
 #![allow(unused)]
 
+use super::*;
 use frame_support::{
 	migration::storage_key_iter,
+	pallet,
 	pallet_prelude::PhantomData,
+	storage_alias,
 	traits::{Get, OnRuntimeUpgrade, ReservableCurrency},
 	weights::Weight,
 	Twox64Concat,
@@ -30,7 +33,7 @@ use parity_scale_codec::{Decode, Encode};
 extern crate alloc;
 #[cfg(feature = "try-runtime")]
 use alloc::{format, string::ToString};
-
+use frame_support::pallet_prelude::ValueQuery;
 use frame_system::pallet_prelude::BlockNumberFor;
 #[cfg(feature = "try-runtime")]
 use scale_info::prelude::string::String;
@@ -516,6 +519,50 @@ impl<T: Config> OnRuntimeUpgrade for PurgeStaleStorage<T> {
 			"Expected {} for `Points` count, Found: {}",
 			delay, staked_count
 		);
+		Ok(())
+	}
+}
+
+#[storage_alias]
+/// Temporary storage item to track whether a given delegator's reserve has been migrated.
+pub type DelegatorReserveToLockMigrations<T: Config> =
+	StorageMap<Pallet<T>, Twox64Concat, AccountIdOf<T>, bool, ValueQuery>;
+
+#[storage_alias]
+/// Temporary storage item to track whether a given collator's reserve has been migrated.
+pub type CollatorReserveToLockMigrations<T: Config> =
+	StorageMap<Pallet<T>, Twox64Concat, AccountIdOf<T>, bool, ValueQuery>;
+
+/// Remove the `DelegatorReserveToLock` and `CollatorReserveToLock` storage items
+pub struct RemoveDelegatorReserveToLockAndCollatorReserveToLock<T>(PhantomData<T>);
+impl<T: Config> OnRuntimeUpgrade for RemoveDelegatorReserveToLockAndCollatorReserveToLock<T> {
+	fn on_runtime_upgrade() -> Weight {
+		log::info!(target: "DelegatorReserveToLock", "running migration to remove storage");
+		log::info!(target: "CollatorReserveToLock", "running migration to remove storage");
+		let mut db_weight = Weight::zero();
+		DelegatorReserveToLockMigrations::<T>::iter_keys().for_each(|k| {
+			DelegatorReserveToLockMigrations::<T>::remove(k.clone());
+			log::info!(target: "DelegatorReserveToLock", "running migration to remove {:?}", k);
+			db_weight = db_weight.saturating_add(T::DbWeight::get().writes(1));
+		});
+		CollatorReserveToLockMigrations::<T>::iter_keys().for_each(|k| {
+			CollatorReserveToLockMigrations::<T>::remove(k.clone());
+			log::info!(target: "CollatorReserveToLock", "running migration to remove {:?}", k);
+			db_weight = db_weight.saturating_add(T::DbWeight::get().writes(1));
+		});
+		db_weight
+	}
+
+	#[cfg(feature = "try-runtime")]
+	fn pre_upgrade() -> Result<Vec<u8>, TryRuntimeError> {
+		// trivial migration
+		Ok(Vec::new())
+	}
+
+	#[cfg(feature = "try-runtime")]
+	fn post_upgrade(_state: Vec<u8>) -> Result<(), TryRuntimeError> {
+		assert_eq!(DelegatorReserveToLockMigrations::<T>::iter_keys().count(), 0);
+		assert_eq!(CollatorReserveToLockMigrations::<T>::iter_keys().count(), 0);
 		Ok(())
 	}
 }
