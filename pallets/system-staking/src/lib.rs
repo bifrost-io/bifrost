@@ -87,7 +87,7 @@ pub mod pallet {
 		>;
 
 		#[pallet::constant]
-		type TreasuryAccount: Get<Self::AccountId>;
+		type BenefitReceivingAccount: Get<Self::AccountId>;
 
 		/// Max token length 500
 		#[pallet::constant]
@@ -539,11 +539,11 @@ pub mod pallet {
 					token_amount,
 				)?;
 
-			// Transfer vtoken(benefits) to TreasuryAccount
+			// Transfer vtoken(benefits) to BenefitReceivingAccount
 			T::MultiCurrency::transfer(
 				vtoken_id,
 				&pallet_account,
-				&T::TreasuryAccount::get(),
+				&T::BenefitReceivingAccount::get(),
 				vtoken_amount,
 			)
 			.map_err(|_| Error::<T>::PayoutFailed)?;
@@ -552,7 +552,7 @@ pub mod pallet {
 				token,
 				vtoken: vtoken_id,
 				from: pallet_account,
-				to: T::TreasuryAccount::get(),
+				to: T::BenefitReceivingAccount::get(),
 				amount: vtoken_amount,
 				vfree: vfree_amount,
 				free: free_amount,

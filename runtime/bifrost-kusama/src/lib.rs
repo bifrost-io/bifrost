@@ -1266,6 +1266,7 @@ parameter_types! {
 	pub const BlocksPerRound: u32 = prod_or_fast!(1500, 50);
 	pub const MaxTokenLen: u32 = 500;
 	pub const MaxFarmingPoolIdLen: u32 = 100;
+	pub BenefitReceivingAccount: AccountId = FeeSharePalletId::get().into_account_truncating();
 }
 
 impl bifrost_system_staking::Config for Runtime {
@@ -1275,7 +1276,7 @@ impl bifrost_system_staking::Config for Runtime {
 	type WeightInfo = weights::bifrost_system_staking::BifrostWeight<Runtime>;
 	type FarmingInfo = Farming;
 	type VtokenMintingInterface = VtokenMinting;
-	type TreasuryAccount = BifrostTreasuryAccount;
+	type BenefitReceivingAccount = BenefitReceivingAccount;
 	type PalletId = SystemStakingPalletId;
 	type BlocksPerRound = BlocksPerRound;
 	type MaxTokenLen = MaxTokenLen;

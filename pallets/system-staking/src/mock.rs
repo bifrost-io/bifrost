@@ -59,6 +59,8 @@ pub const BOB: AccountId = AccountId32::new([1u8; 32]);
 pub const CHARLIE: AccountId = AccountId32::new([3u8; 32]);
 pub const TREASURY_ACCOUNT: AccountId32 = AccountId32::new([9u8; 32]);
 
+pub const BENEFIT_RECEIVING_ACCOUNT: AccountId32 = AccountId32::new([9u8; 32]);
+
 frame_support::construct_runtime!(
 	pub enum Runtime {
 		System: frame_system,
@@ -79,6 +81,7 @@ type Block = frame_system::mocking::MockBlock<Runtime>;
 
 parameter_types! {
 	pub const BlockHashCount: u64 = 250;
+	pub const TreasuryAccount: AccountId32 = TREASURY_ACCOUNT;
 }
 
 #[derive_impl(frame_system::config_preludes::TestDefaultConfig as frame_system::DefaultConfig)]
@@ -296,7 +299,7 @@ impl bifrost_farming::Config for Runtime {
 }
 
 parameter_types! {
-	pub const TreasuryAccount: AccountId32 = TREASURY_ACCOUNT;
+	pub const BenefitReceivingAccount: AccountId32 = BENEFIT_RECEIVING_ACCOUNT;
 	pub const BlocksPerRound: u32 = 5;
 	pub const MaxTokenLen: u32 = 50;
 	pub const MaxFarmingPoolIdLen: u32 = 100;
@@ -309,7 +312,7 @@ impl system_staking::Config for Runtime {
 	type WeightInfo = ();
 	type FarmingInfo = Farming;
 	type VtokenMintingInterface = VtokenMinting;
-	type TreasuryAccount = TreasuryAccount;
+	type BenefitReceivingAccount = BenefitReceivingAccount;
 	type PalletId = SystemStakingPalletId;
 	type BlocksPerRound = BlocksPerRound;
 	type MaxTokenLen = MaxTokenLen;
